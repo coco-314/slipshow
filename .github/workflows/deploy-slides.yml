@@ -1,0 +1,51 @@
+name: Deploy Slides
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_path:
+        description: 'Full path to the source slide (e.g., "docs/my-slides.md")'
+        required: true
+      output_path:
+        description: 'Full path to the output slide (e.g., "docs/html/my-slides.html")'
+        required: true
+      slipshow_version:
+        description: 'Version of slipshow to use (e.g., "v0.6.0").'
+        required: true
+        default: 'v0.6.0'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Determine slipshow version to use and URL to get it
+        id: determine_version
+        run: |
+          echo "Using slipshow version ${{ github.event.inputs.slipshow_version }}."
+          RELEASE_URL="https://github.com/panglesd/slipshow/releases/download/${{ github.event.inputs.slipshow_version }}/slipshow-linux-x86_64.tar"
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+
+      - name: Install slipshow ${{ github.event.inputs.slipshow_version }}
+        run: |
+          wget ${{ steps.determine_version.outputs.release_url }}
+          tar -xvf slipshow-linux-x86_64.tar --strip-components=1
+          sudo mv slipshow /usr/local/bin/slipshow
+
+      - name: Compile slides ${{ github.event.inputs.source_path }}
+        run: slipshow compile ${{ github.event.inputs.source_path }} -o ${{ github.event.inputs.output_path }}
+
+      - name: Extract output directory
+        id: extract_output_dir
+        run: |
+          OUTPUT_DIR=$(dirname "${{ github.event.inputs.output_path }}")
+          echo "publish_dir=$OUTPUT_DIR" >> $GITHUB_OUTPUT
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ steps.extract_output_dir.outputs.publish_dir }}
+          destination_dir: docs
+          enable_jekyll: true
