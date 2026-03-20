@@ -13,7 +13,11 @@ on:
         description: 'Version of slipshow to use (e.g., "v0.6.0").'
         required: true
         default: 'v0.6.0'
-
+      destination_dir:
+        description: 'Destination directory on GitHub Pages (e.g., "docs").'
+        required: true
+        default: 'docs'
+        
 jobs:
   deploy:
     runs-on: ubuntu-22.04
@@ -23,9 +27,24 @@ jobs:
       - name: Determine slipshow version to use and URL to get it
         id: determine_version
         run: |
-          echo "Using slipshow version ${{ github.event.inputs.slipshow_version }}."
-          RELEASE_URL="https://github.com/panglesd/slipshow/releases/download/${{ github.event.inputs.slipshow_version }}/slipshow-linux-x86_64.tar"
-          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+          if [ "${{ github.event.inputs.slipshow_version }}" = "latest" ]; then
+            # Use the latest version
+            echo "Using latest slipshow version."
+            LATEST_RELEASE_URL=$(curl -s https://api.github.com/repos/panglesd/slipshow/releases/latest | jq -r '.assets[0].browser_download_url')
+            echo "release_url=$LATEST_RELEASE_URL" >> $GITHUB_OUTPUT
+          else
+            # Check if the specified version exists
+            echo "Checking if slipshow version ${{ github.event.inputs.slipshow_version }} exists..."
+            VERSION_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" "https://github.com/panglesd/slipshow/releases/tag/${{ github.event.inputs.slipshow_version }}")
+            if [ "$VERSION_EXISTS" -ne "200" ]; then
+              echo "Error: slipshow version ${{ github.event.inputs.slipshow_version }} does not exist."
+              exit 1
+            fi
+            # Use the specified version
+            echo "Using slipshow version ${{ github.event.inputs.slipshow_version }}."
+            RELEASE_URL="https://github.com/panglesd/slipshow/releases/download/${{ github.event.inputs.slipshow_version }}/slipshow-linux-x86_64.tar"
+            echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+          fi
 
       - name: Install slipshow ${{ github.event.inputs.slipshow_version }}
         run: |
@@ -47,5 +66,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ${{ steps.extract_output_dir.outputs.publish_dir }}
-          destination_dir: docs
+          destination_dir: ${{ github.event.inputs.destination_dir }}
           enable_jekyll: true
