@@ -30,7 +30,7 @@ jobs:
           if [ "${{ github.event.inputs.slipshow_version }}" = "latest" ]; then
             # Use the latest version
             echo "Using latest slipshow version."
-            LATEST_RELEASE_URL=$(curl -s https://api.github.com/repos/panglesd/slipshow/releases/latest | jq -r '.assets[0].browser_download_url')
+            LATEST_RELEASE_URL=$(curl -s https://api.github.com/repos/panglesd/slipshow/releases/latest | jq -r '.assets[] | select(.name == "slipshow-linux-x86_64.tar") | .browser_download_url')
             echo "release_url=$LATEST_RELEASE_URL" >> $GITHUB_OUTPUT
           else
             # Check if the specified version exists
@@ -49,17 +49,7 @@ jobs:
       - name: Install slipshow ${{ github.event.inputs.slipshow_version }}
         run: |
           wget ${{ steps.determine_version.outputs.release_url }}
-          DOWNLOADED_FILE=$(basename ${{ steps.determine_version.outputs.release_url }})
-          if [[ "$DOWNLOADED_FILE" == *.tbz ]]; then
-            echo "Extracting tbz archive from $DOWNLOADED_FILE..."
-            tar -xjvf "$DOWNLOADED_FILE" --strip-components=1
-          elif [[ "$DOWNLOADED_FILE" == *.tar ]]; then
-            echo "Extracting tar archive from $DOWNLOADED_FILE..."
-            tar -xvf "$DOWNLOADED_FILE" --strip-components=1
-          else
-            echo "Error: Unknown archive format for $DOWNLOADED_FILE"
-            exit 1
-          fi
+          tar -xvf slipshow-linux-x86_64.tar --strip-components=1
           sudo mv slipshow /usr/local/bin/slipshow
 
       - name: Compile slides ${{ github.event.inputs.source_path }}
